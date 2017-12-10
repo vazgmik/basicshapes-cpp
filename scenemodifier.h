@@ -92,17 +92,16 @@ private:
             return child;
         }
 
-        bool CheckCollide(Node *sphere2)
+        bool CheckCollide(const Node* const sphere2)
         {
             auto distance = this->center.distanceToPoint(sphere2->center);
-            return distance < this->radius + sphere2->radius;
+            return distance <= this->radius + sphere2->radius;
         }
 
         Node(QVector3D cent,float rad,QColor color)
+            :center(cent),radius(rad),colour(color)
         {
-            center = cent;
-            radius = rad;
-            colour = color;
+
         }
 
         ~Node()
@@ -120,31 +119,34 @@ private:
     public:
         Node * parent;
         QVector<QColor> colors;
-
+        const int PLANESIZE = 3;
     public:
         Tree();
         ~Tree();
         Tree(Node root,QVector< Node *> child);
         void SetParent(Node *root);
-        void Draw(SceneModifier *, QVector<Node *> children, Node *parent);
+        void Draw(SceneModifier *const, QVector<Node *> children, Node *parent);
         void GenerateRandNodes(int layer,Node * par);
-        void GenerateNodes(int layer,QVector<Node*>children);
+        void GenerateNodes(const int layer,QVector<Node*>children);
         void CreateColors();
-        QVector<Node *> CreateCandidates(Node * par, int layer);
-        void GeneratePlaneSpheres(Node * par, int nodes, int layer);
-        void CreateLeftOnes(int, QVector<Node *> &, int y_level, int layer);
+        QVector<Node *> CreateCandidates(const Node * const par, const int& layer);
+        void GeneratePlaneSpheres(Node * const par, const int& nodes, const int& layer);
+        void CreateRestOnes(Node *,const int&, QVector<Node *> &, const int&);
         //plane equation coefficients
-        double CalcA(QVector3D &A, QVector3D &B, QVector3D &C);
-        double CalcB(QVector3D &A, QVector3D &B, QVector3D &C);
-        double CalcC(QVector3D &A, QVector3D &B, QVector3D &C);
-        double CalcD(QVector3D &A, double a, double b, double c);
+        double CalcA(const QVector3D& A, const QVector3D& B, const QVector3D& C);
+        double CalcB(const QVector3D& A, const QVector3D& B, const QVector3D& C);
+        double CalcC(const QVector3D& A, const QVector3D& B, const QVector3D& C);
+        double CalcD(const QVector3D& A, const double &a, const double &b, const double &c);
+        bool CollideOrExist(const Node* const node, Node * const inner);
     } spheres;
 
     static constexpr int NMAX = 5;
-    static constexpr int L = 5;
+    static constexpr int L = 3;
+    static constexpr float RADNODE = 0.1;
+    static constexpr float RADROOT = 0.3;
 private:
-    void DrawLine(QVector3D,QVector3D );
-    void DrawSphere(QVector3D ,QColor,float );
+    void DrawLine(const QVector3D&,const QVector3D& );
+    void DrawSphere(const QVector3D& ,QColor,float );
 
 };
 

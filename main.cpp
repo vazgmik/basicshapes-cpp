@@ -138,7 +138,7 @@ int main(int argc, char **argv)
 
     // Create control widgets
     QCommandLinkButton *info = new QCommandLinkButton();
-    info->setText(QStringLiteral("Qt3D ready-made meshes"));
+    info->setText(QStringLiteral("Test task with Qt3D ready-made meshes"));
     info->setDescription(QString::fromLatin1("Qt3D provides several ready-made meshes, like torus, cylinder, cone, "
                                              "cube, plane and sphere."));
     info->setIconSize(QSize(0,0));

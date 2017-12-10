@@ -60,67 +60,20 @@
 #include <cmath>
 #include <ctime>
 
-//check in the same plane
-/**
- * @return area of triangle based on Heron formula
- */
-double areaOfTriangle( double edge1, double edge2, double edge3) {
-    double s = 0.5 * ( edge1 + edge2 + edge3);
-    return std::sqrt( s * ( s - edge1) * ( s - edge2) * ( s - edge3));
-}
-
-/**
- * U, V, W, u, v, w are lengths of edges of the tetrahedron, as in
- * http://en.wikipedia.org/wiki/Tetrahedron
- * @param U basis edge 1
- * @param V basis edge 2
- * @param W basis edge 3
- * @param u opposite to U
- * @param v opposite to V
- * @param w opposite to W
- * @return collinearness
- */
-bool heron_3d( double U, double V, double W,
-               double u, double v, double w) {
-    double areas[] = { areaOfTriangle( U, V, W),
-                       areaOfTriangle( U, v, w),
-                       areaOfTriangle( V, u, w),
-                       areaOfTriangle( W, u, v)};
-    for ( int i = 0; i < 4; ++i) {
-        double area = areas[ i];
-        double sum = 0;
-        for ( int j = 1; j < 4; ++j) {
-            sum += areas[ (i + j) % 4];
-        }
-        if ( area == sum) return true;
-    }
-    return false;
-}
 
 
 SceneModifier::SceneModifier(Qt3DCore::QEntity *rootEntity)
     : m_rootEntity(rootEntity)
 {  
-    srand(time(0));
-
     //create and draw parent node
-    spheres.SetParent( new Node( QVector3D(0,8,0), 0.3,spheres.colors[0]) );
+    spheres.SetParent( new Node( QVector3D(0,8,0), RADROOT,spheres.colors[0]) );
     auto parent = spheres.parent;
     DrawSphere(parent->center,parent->colour,parent->radius);
 
 
     spheres.GenerateRandNodes(1,parent);
+
     spheres.GenerateNodes(2,parent->children);
-
-   /* auto child1 = parent->AddChild( new Node(QVector3D(-1,7.5,0), 0.1,colors[1]) );
-    auto child2 = parent->AddChild( new Node(QVector3D(1,7.5,0), 0.1,colors[1]) );
-
-    child1->AddChild(new Node(QVector3D(-1,7.0,0), 0.1,colors[2]) );
-    child1->AddChild(new Node(QVector3D(1,7.0,0), 0.1,colors[2]) );
-
-    child2->AddChild(new Node(QVector3D(3,6.0,1), 0.1,colors[2]) );
-    child2->AddChild(new Node(QVector3D(2.5,6.0,-1), 0.1,colors[2]) );
-    child2->AddChild(new Node(QVector3D(-2,6.0,1), 0.1,colors[2]) );*/
 
     spheres.Draw(this,parent->children,parent);
 
@@ -131,7 +84,7 @@ SceneModifier::~SceneModifier()
 
 }
 
-void SceneModifier::DrawLine(QVector3D a,QVector3D b)
+void SceneModifier::DrawLine(const QVector3D& a,const QVector3D& b)
 {
     Qt3DRender::QGeometryRenderer * meshRenderer = new Qt3DRender::QGeometryRenderer;
     Qt3DRender::QGeometry * geometry = new Qt3DRender::QGeometry(meshRenderer);
@@ -210,9 +163,12 @@ void SceneModifier::DrawLine(QVector3D a,QVector3D b)
     entity->addComponent(material);
 
     entity->setParent(m_rootEntity);
+
+    delete [] vertexRawData;
+
 }
 
-void SceneModifier::DrawSphere(QVector3D a,QColor color,float radius)
+void SceneModifier::DrawSphere(const QVector3D& a,QColor color,float radius)
 {
     // Sphere shape data
     Qt3DExtras::QSphereMesh *sphereMesh = new Qt3DExtras::QSphereMesh();
@@ -262,18 +218,18 @@ void SceneModifier::Tree::SetParent(SceneModifier::Node *root)
     parent = root;
 }
 
-void SceneModifier::Tree::Draw(SceneModifier * sc,QVector<Node*>children,Node* parent)
+void SceneModifier::Tree::Draw(SceneModifier * const sc, QVector<Node*>children, Node* parent)
 {
     if(children.size() == 0)
         return;
 
-    for(int i = 0; i< children.size(); ++i)
+    for(size_t i = 0; i < children.size(); ++i)
     {
         sc->DrawSphere(children[i]->center,children[i]->colour,children[i]->radius);
         sc->DrawLine(parent->center,children[i]->center);
     }
 
-    for(int i = 0; i< children.size(); ++i)
+    for(size_t i = 0; i< children.size(); ++i)
     {
         Draw(sc,children[i]->children,children[i]);
     }
@@ -282,88 +238,108 @@ void SceneModifier::Tree::Draw(SceneModifier * sc,QVector<Node*>children,Node* p
 
 void SceneModifier::Tree::GenerateRandNodes(int layer,Node * par)
 {
-   int nodes = rand() % NMAX + 1;
-   if( nodes > 3)
-   {
-       GeneratePlaneSpheres(par,nodes,layer);
-   }
-   else
-   {
-       int y_level = par->center.y()-1;
+    std::mt19937 gen;
+    gen.seed(std::random_device{}());
+    std::uniform_int_distribution<> dis(1, NMAX);
+    int nodes = dis(gen);
+    if( nodes > PLANESIZE)
+    {
+        GeneratePlaneSpheres(par,nodes,layer);
+    }
+    else
+    {
+        QVector3D translpoint(par->center.x(),par->center.y() - 30*par->radius,par->center.z() );
 
-       int signx = rand() % 2 == 0 ? 1 : -1;
-       int signz = rand() % 2 == 0 ? 1 : -1;
+        std::uniform_real_distribution<double> xDistr(translpoint.x() - 20*par->radius, translpoint.x() + 20*par->radius);
+        std::uniform_real_distribution<double> yDistr(translpoint.y() - 20*par->radius, translpoint.y() + 20*par->radius);
+        std::uniform_real_distribution<double> zDistr(translpoint.z() - 20*par->radius, translpoint.z() + 20*par->radius);
 
-       for(int i = 0; i<nodes; ++i)
-       {
-           QVector3D temp(signx*(rand() % 8),y_level,signz * (rand() % 8));
-           par->AddChild(new Node(temp,0.1,colors[layer]));
-       }
-   }
+        QVector <Node*> candidates;
+        while( candidates.size() < nodes)
+        {
+            QVector3D temp(xDistr(gen),yDistr(gen),zDistr(gen));
+            auto candidate = new Node(temp,RADNODE,colors[layer]);
+            if( ! CollideOrExist(candidate,parent) )
+            {
+                candidates.push_back(candidate);
+            }
+
+        }
+
+        for(size_t i = 0; i< candidates.size(); ++i)
+        {
+             par->AddChild(candidates[i]);
+        }
+    }
 }
 
-void SceneModifier::Tree::GeneratePlaneSpheres(Node * par,int nodes,int layer)
+void SceneModifier::Tree::GeneratePlaneSpheres(Node* const  par, const int &nodes, const int &layer)
 {
     QVector<Node *> candidates = CreateCandidates(par,layer);
-    CreateLeftOnes(nodes,candidates,par->center.y()-1,layer);
+    CreateRestOnes(par,nodes,candidates,layer);
 
-    for(int i = 0; i< candidates.size(); ++i)
+    for(size_t i = 0; i< candidates.size(); ++i)
     {
          par->AddChild(candidates[i]);
     }
 }
 
-double SceneModifier::Tree::CalcA(QVector3D &A, QVector3D &B, QVector3D &C)
+double SceneModifier::Tree::CalcA(const QVector3D &A, const QVector3D &B, const QVector3D &C)
 {
     return (B.y() - A.y()) * (C.z() - A.z()) - (C.y() - A.y()) * (B.z()-A.z());
 }
 
-double SceneModifier::Tree::CalcB(QVector3D &A, QVector3D &B, QVector3D &C)
+double SceneModifier::Tree::CalcB(const QVector3D &A,const QVector3D &B,const QVector3D &C)
 {
     return (B.z() - A.z()) * (C.x() - A.x()) - (C.z() - A.z()) * (B.x()-A.x());
 }
 
-double SceneModifier::Tree::CalcC(QVector3D &A, QVector3D &B, QVector3D &C)
+double SceneModifier::Tree::CalcC(const QVector3D &A,const QVector3D &B,const QVector3D &C)
 {
     return (B.x() - A.x()) * (C.y() - A.y()) - (C.x() - A.x()) * (B.y()-A.y());
 }
 
-double SceneModifier::Tree::CalcD(QVector3D &A,double a,double b, double c)
+double SceneModifier::Tree::CalcD(const QVector3D &A,const double& a,const double& b, const double& c)
 {
     return -(a*A.x() + b*A.y() + c*A.z());
 }
 
-QVector<SceneModifier::Node *> SceneModifier::Tree::CreateCandidates(Node * par,int layer)
+bool SceneModifier::Tree::CollideOrExist(const SceneModifier::Node *const node, Node * const inner )
 {
+    if(inner->CheckCollide(node))
+        return true;
+
+    for(size_t i = 0; i < inner->children.size(); ++i){
+        if ( CollideOrExist(node,inner->children[i]) ){
+            return true;
+        }
+    }
+    return false;
+}
+
+QVector<SceneModifier::Node *> SceneModifier::Tree::CreateCandidates(const Node * const par, const int& layer)
+{
+    std::mt19937 gen;
+    gen.seed(std::random_device{}());
+
     bool isplane = false;
     QVector<Node *> candidates;
     while(!isplane)
     {
-        int y_level = par->center.y()-1;
 
-        int signx = rand() % 2 == 0 ? 1 : -1;
-        int signz = rand() % 2 == 0 ? 1 : -1;
+        QVector3D translpoint(par->center.x(),par->center.y() - 30*par->radius,par->center.z() );
 
-        while(candidates.size() < 3)
+        std::uniform_real_distribution<double> xDistr(translpoint.x() - 20*par->radius, translpoint.x() + 20*par->radius);
+        std::uniform_real_distribution<double> yDistr(translpoint.y() - 20*par->radius, translpoint.y() + 20*par->radius);
+        std::uniform_real_distribution<double> zDistr(translpoint.z() - 20*par->radius, translpoint.z() + 20*par->radius);
+
+        while(candidates.size() < PLANESIZE)
         {
-            QVector3D temp(signx*(rand() % 8),y_level,signz * (rand() % 8));
-            auto cand = new Node(temp,0.1,colors[layer]);
+            QVector3D temp(xDistr(gen),yDistr(gen),zDistr(gen));
+            auto cand = new Node(temp,RADNODE,colors[layer]);
 
-            bool valid = !candidates.contains(cand);
-            if(valid)
+            if(!CollideOrExist(cand,parent))
             {
-                for(int index = 0; index<candidates.size(); ++index)
-                {
-                    if( candidates[index]->CheckCollide(cand) )
-                    {
-                        valid = false;
-                        break;
-                    }
-                }
-
-            }
-
-            if(valid){
                 candidates.push_back(cand);
             }
             else
@@ -375,6 +351,7 @@ QVector<SceneModifier::Node *> SceneModifier::Tree::CreateCandidates(Node * par,
         auto A = candidates[0]->center;
         auto B = candidates[1]->center;
         auto C = candidates[2]->center;
+
         // ax+by+cz+d = 0 =>  x = (-d - cz - by)/a;  y = (-d - cz - ax)/b; ; z = (-d - ax - by)/c ;
         double a = CalcA(A,B,C);
         double b = CalcB(A,B,C);
@@ -386,11 +363,15 @@ QVector<SceneModifier::Node *> SceneModifier::Tree::CreateCandidates(Node * par,
     return candidates;
 }
 
-void SceneModifier::Tree::CreateLeftOnes(int nodes, QVector<Node *> & candidates,int y_level,int layer)
+void SceneModifier::Tree::CreateRestOnes(Node * par,const int& nodes, QVector<Node *> & candidates,const int& layer)
 {
+    std::mt19937 gen;
+    gen.seed(std::random_device{}());
+
     auto A = candidates[0]->center;
     auto B = candidates[1]->center;
     auto C = candidates[2]->center;
+
     // ax+by+cz+d = 0 =>  x = (-d - cz - by)/a;  y = (-d - cz - ax)/b; ; z = (-d - ax - by)/c ;
     double a = CalcA(A,B,C);
     double b = CalcB(A,B,C);
@@ -400,78 +381,66 @@ void SceneModifier::Tree::CreateLeftOnes(int nodes, QVector<Node *> & candidates
     while(candidates.size() < nodes)
     {
         Node * cand = 0;
-        int signx = rand() % 2 == 0 ? 1 : -1;
-        int signz = rand() % 2 == 0 ? 1 : -1;
+
+        QVector3D translpoint(par->center.x(),par->center.y() - 25*par->radius,par->center.z() );
+
+        std::uniform_real_distribution<double> xDistr(translpoint.x() - 20*par->radius, translpoint.x() + 20*par->radius);
+        std::uniform_real_distribution<double> yDistr(translpoint.y() - 20*par->radius, translpoint.y() + 20*par->radius);
+        std::uniform_real_distribution<double> zDistr(translpoint.z() - 20*par->radius, translpoint.z() + 20*par->radius);
         if(a != 0)
         {
-            double rand_y = (rand() % y_level);
-            double rand_z = signz * (rand() % 8);
+            double rand_y = yDistr(gen);
+            double rand_z = zDistr(gen);
             double x = ( -d - b*rand_y - c*rand_z) / a;
 
             QVector3D temp(x,rand_y, rand_z);
-            cand = new Node(temp,0.1,colors[layer]);
-            //par->AddChild(new Node(temp,0.1,colors[layer]));
+            cand = new Node(temp,RADNODE,colors[layer]);
         }
         else if(c !=  0)
         {
-            double rand_x = signx * (rand() % 8);
-            double rand_y = (rand() % y_level);
+            double rand_x = xDistr(gen);
+            double rand_y = yDistr(gen);
             double z = ( -d - a*rand_x - b*rand_y) / c;
 
             QVector3D temp(rand_x,rand_y, z);
-            cand = new Node(temp,0.1,colors[layer]);
-            //par->AddChild(new Node(temp,0.1,colors[layer]));
+            cand = new Node(temp,RADNODE,colors[layer]);
         }
         else if(b !=  0)
         {
-            double rand_x = signx * (rand() % 8);
-            double rand_z = signz * (rand() % 8);
+            double rand_x = xDistr(gen);
+            double rand_z = zDistr(gen);
             double y = ( -d - a*rand_x - c*rand_z) / b;
 
             QVector3D temp(rand_x,y, rand_z);
-            cand = new Node(temp,0.1,colors[layer]);
-            //par->AddChild(new Node(temp,0.1,colors[layer]));
+            cand = new Node(temp,RADNODE,colors[layer]);
         }
 
-        bool valid = cand != 0 && !candidates.contains(cand);
-        if(valid)
+        if(!CollideOrExist(cand,parent))
         {
-            for(int index = 0; index<candidates.size(); ++index)
-            {
-                if( candidates[index]->CheckCollide(cand) )
-                {
-                    valid = false;
-                    break;
-                }
-            }
-
-        }
-
-        if(valid){
             candidates.push_back(cand);
         }
         else
         {
-            if(cand != 0)
+            if(cand)
                 delete cand;
         }
     }
 }
 
-void SceneModifier::Tree::GenerateNodes(int layer, QVector<Node*>children)
+void SceneModifier::Tree::GenerateNodes(const int layer, QVector<Node*>children)
 {
     if(layer >= L)
         return;
 
-    for(int i=0; i<children.size();++i)
+    for(size_t i = 0; i < children.size(); ++i)
     {
         GenerateRandNodes(layer,children[i]);
     }
 
-    layer++;
-    for(int i=0; i<children.size();++i)
+
+    for(size_t i = 0; i < children.size(); ++i)
     {
-        GenerateNodes(layer,children[i]->children);
+        GenerateNodes(layer+1,children[i]->children);
     }
 
 }
